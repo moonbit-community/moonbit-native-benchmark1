@@ -140,14 +140,14 @@ fn bench_setup() -> Result<Vec<Demo>> {
         .status()?;
     assert!(status.success());
 
-    let exe_path = bins_dir.join("mbt.exe");
-    eprintln!("INFO: copying the .exe to `{}`...", exe_path.display());
+    let mbt_exe_path = bins_dir.join("mbt.exe");
+    eprintln!("INFO: copying the .exe to `{}`...", mbt_exe_path.display());
     let exe = fs::read_dir(mbt_dir.join("target/native/release/build/main"))?
         .find(|e| e.as_ref().is_ok_and(|e| e.file_name() == "main.exe"))
         .context("exe not found")??;
-    fs::copy(exe.path(), &exe_path)?;
+    fs::copy(exe.path(), &mbt_exe_path)?;
 
-    eprintln!("INFO: compiling the Java FFT demo...");
+    eprintln!("INFO: compiling the OpenJDK FFT demo...");
     let java_dir = cwd.join("java");
     let status = Command::new("mvn")
         .arg("package")
@@ -168,17 +168,36 @@ fn bench_setup() -> Result<Vec<Demo>> {
         .context("jar not found")??;
     fs::copy(jar.path(), &jar_path)?;
 
+    eprintln!("INFO: compiling the GraalVM FFT demo...");
+    let status = Command::new("mvn")
+        .args(["-Pnative", "package"])
+        .current_dir(&java_dir)
+        .status()?;
+    assert!(status.success());
+
+    let graalvm_exe_path = bins_dir.join("java.exe");
+    eprintln!(
+        "INFO: copying the .exe to `{}`...",
+        graalvm_exe_path.display()
+    );
+    let exe = fs::read_dir(java_dir.join("target"))?
+        .find(|e| e.as_ref().is_ok_and(|e| e.file_name() == "fft"))
+        .context("exe not found")??;
+    fs::copy(exe.path(), &graalvm_exe_path)?;
+
     let mut demos = vec![];
 
     eprintln!("INFO: checking the correctness of the Moonbit FFT demo...");
     eprintln!("WARN: currently the Moonbit demo has no I/O except stdout prints");
-    // TODO: Add stdin for both demos.
-    let mut mbt_demo = Demo::new("Moonbit", Command::new(&exe_path));
+    let mut mbt_demo = Demo::new("Moonbit", {
+        // TODO: Add stdin for both demos.
+        Command::new(&mbt_exe_path)
+    });
     mbt_demo.assert_working(&sized_data)?;
     demos.push(mbt_demo);
 
-    eprintln!("INFO: checking the correctness of the Java FFT demo...");
-    let mut java_demo = Demo::new("Java", {
+    eprintln!("INFO: checking the correctness of the OpenJDK FFT demo...");
+    let mut openjdk_demo = Demo::new("OpenJDK", {
         let mut cmd = Command::new("java");
         cmd.arg("-jar").arg(&jar_path);
         // TODO: Add stdin for both demos.
@@ -187,8 +206,16 @@ fn bench_setup() -> Result<Vec<Demo>> {
         // )?)
         cmd
     });
-    java_demo.assert_working(&sized_data)?;
-    demos.push(java_demo);
+    openjdk_demo.assert_working(&sized_data)?;
+    demos.push(openjdk_demo);
+
+    eprintln!("INFO: checking the correctness of the GraalVM FFT demo...");
+    let mut graalvm_demo = Demo::new("GraalVM", {
+        // TODO: Add stdin for both demos.
+        Command::new(&graalvm_exe_path)
+    });
+    graalvm_demo.assert_working(&sized_data)?;
+    demos.push(graalvm_demo);
 
     Ok(demos)
 }
