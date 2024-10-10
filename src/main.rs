@@ -1,13 +1,16 @@
 use anyhow::{Context, Result};
+use divan::Bencher;
 use pretty_assertions::assert_eq;
 use rustfft::{algorithm::Radix4, num_complex::Complex, Fft, FftDirection};
-use std::time::Instant;
 use std::{
     env,
+    fmt::{self, Display},
     fs::{self, File},
     io::{prelude::*, LineWriter},
     path::Path,
     process::Command,
+    sync::Mutex,
+    time::Instant,
 };
 
 const INPUT_PRECISION: usize = 2;
@@ -92,7 +95,24 @@ fn generate_data(data_dir: &Path, len: usize, output_files: bool) -> Result<Vec<
     Ok(outputs)
 }
 
-fn main() -> Result<()> {
+fn main() {
+    divan::main();
+}
+
+#[divan::bench(args = bench_setup().expect("bench demo setup failed"))]
+fn bench_fft_demo(bencher: Bencher, demo: &Demo) {
+    bencher.bench(|| {
+        divan::black_box(
+            demo.cmd
+                .lock()
+                .unwrap()
+                .output()
+                .expect("failed to execute the demo"),
+        )
+    });
+}
+
+fn bench_setup() -> Result<Vec<Demo>> {
     let sizes = &[
         // 4, 64, 256, 1024, 4096,
         16384,
@@ -148,49 +168,74 @@ fn main() -> Result<()> {
         .context("jar not found")??;
     fs::copy(jar.path(), &jar_path)?;
 
-    eprintln!("INFO: testing the Moonbit FFT demo...");
+    let mut demos = vec![];
+
+    eprintln!("INFO: checking the correctness of the Moonbit FFT demo...");
     eprintln!("WARN: currently the Moonbit demo has no I/O except stdout prints");
     // TODO: Add stdin for both demos.
-    test_demo("Moonbit", &mut Command::new(&exe_path), &sized_data)?;
+    let mut mbt_demo = Demo::new("Moonbit", Command::new(&exe_path));
+    mbt_demo.assert_working(&sized_data)?;
+    demos.push(mbt_demo);
 
-    eprintln!("INFO: testing the Java FFT demo...");
-    test_demo(
-        "Java",
-        Command::new("java").arg("-jar").arg(&jar_path),
+    eprintln!("INFO: checking the correctness of the Java FFT demo...");
+    let mut java_demo = Demo::new("Java", {
+        let mut cmd = Command::new("java");
+        cmd.arg("-jar").arg(&jar_path);
         // TODO: Add stdin for both demos.
         // .stdin(File::open(
         //     data_dir.join("inputs").join(format!("{size}.dat")),
         // )?)
-        &sized_data,
-    )?;
+        cmd
+    });
+    java_demo.assert_working(&sized_data)?;
+    demos.push(java_demo);
 
-    Ok(())
+    Ok(demos)
 }
 
-fn test_demo(
-    name: &str,
-    cmd: &mut Command,
-    sized_data: &[(usize, Vec<Complex<f64>>)],
-) -> Result<()> {
-    for (size, expected) in sized_data {
-        eprint!("INFO: testing the {name} FFT demo where size={size:.<8}");
-        let now = Instant::now();
-        let out = cmd.output()?;
-        let elapsed = now.elapsed();
-        eprint!("\telapsed {elapsed:?}");
-        assert_eq!(
-            &std::str::from_utf8(&out.stdout)?
-                .lines()
-                .map(|l| {
-                    let (re, im) = l.split_once(',').context("expected a comma")?;
-                    let re = re.parse::<f64>()?;
-                    let im = im.parse::<f64>()?;
-                    Ok(Complex { re, im })
-                })
-                .collect::<Result<Vec<_>>>()?,
-            expected
-        );
-        eprintln!("\tOK");
+struct Demo {
+    name: String,
+    cmd: Mutex<Command>,
+}
+
+impl Display for Demo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.name)
     }
-    Ok(())
+}
+
+impl Demo {
+    fn new(name: &str, cmd: Command) -> Self {
+        Self {
+            name: name.to_owned(),
+            cmd: Mutex::new(cmd),
+        }
+    }
+
+    fn assert_working(&mut self, sized_data: &[(usize, Vec<Complex<f64>>)]) -> Result<()> {
+        for (size, expected) in sized_data {
+            eprint!(
+                "INFO: testing the {} FFT demo where size={size:.<8}",
+                self.name
+            );
+            let now = Instant::now();
+            let out = self.cmd.lock().unwrap().output()?;
+            let elapsed = now.elapsed();
+            eprint!("\telapsed {elapsed:?}");
+            assert_eq!(
+                &std::str::from_utf8(&out.stdout)?
+                    .lines()
+                    .map(|l| {
+                        let (re, im) = l.split_once(',').context("expected a comma")?;
+                        let re = re.parse::<f64>()?;
+                        let im = im.parse::<f64>()?;
+                        Ok(Complex { re, im })
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                expected
+            );
+            eprintln!("\tOK");
+        }
+        Ok(())
+    }
 }
