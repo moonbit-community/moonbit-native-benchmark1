@@ -54,6 +54,9 @@ fn generate_data(data_dir: &Path, len: usize, output_files: bool) -> Result<Vec<
     let inputs = round(generate_inputs(len));
     {
         let inputs_dir = data_dir.join("inputs");
+        if !inputs_dir.exists() {
+            fs::create_dir_all(&inputs_dir)?;
+        }
         let fout = File::create(inputs_dir.join(format!("{len}.dat")))?;
         let mut fout = LineWriter::new(fout);
         for datum in &inputs {
@@ -70,6 +73,9 @@ fn generate_data(data_dir: &Path, len: usize, output_files: bool) -> Result<Vec<
     let outputs = round(fft(inputs));
     if output_files {
         let outputs_dir = data_dir.join("outputs");
+        if !outputs_dir.exists() {
+            fs::create_dir_all(&outputs_dir)?;
+        }
         let fout = File::create(outputs_dir.join(format!("{len}.dat")))?;
         let mut fout = LineWriter::new(fout);
         for datum in &outputs {
@@ -102,6 +108,9 @@ fn main() -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
 
     let bins_dir = cwd.join("bins");
+    if !bins_dir.exists() {
+        fs::create_dir_all(&bins_dir)?;
+    }
 
     eprintln!("INFO: compiling the Moonbit FFT demo...");
     let mbt_dir = cwd.join("mbt");
