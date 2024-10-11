@@ -14,7 +14,8 @@ implemented naively without further optimizations.
 Please ensure that you have the following prerequisites installed:
 
 - A recent Rust toolchain. You can install it from [rustup.rs](https://rustup.rs).
-- A recent (21+) Java Development Kit (we recommend OpenJDK).
+- A recent OpenJDK installation (Java 21+), located at `JAVA_HOME`.
+- A recent GraalVM installation (Java 21+), located at `GRAALVM_HOME`.
 - Maven (for building the Java part of the demo).
 - A recent MoonBit toolchain. You can install it from [moonbitlang.com](https://www.moonbitlang.com/download).
 
@@ -33,10 +34,11 @@ cargo bench
 On my MacBook Pro M1 Pro, this gives something like the following:
 
 ```console
-...
+[..]
 Timer precision: 41 ns
 fft                fastest       │ slowest       │ median        │ mean          │ samples │ iters
 ╰─ bench_fft_demo                │               │               │               │         │
-   ├─ Java         189.6 ms      │ 215.4 ms      │ 203.3 ms      │ 203.6 ms      │ 100     │ 100
-   ╰─ MoonBit      87.74 ms      │ 93.86 ms      │ 88.63 ms      │ 88.8 ms       │ 100     │ 100
+   ├─ GraalVM      54.53 ms      │ 61.28 ms      │ 56.14 ms      │ 56.39 ms      │ 100     │ 100
+   ├─ MoonBit      16.62 ms      │ 17.65 ms      │ 16.92 ms      │ 16.96 ms      │ 100     │ 100
+   ╰─ OpenJDK      188.6 ms      │ 219.6 ms      │ 203.5 ms      │ 203.9 ms      │ 100     │ 100
 ```
