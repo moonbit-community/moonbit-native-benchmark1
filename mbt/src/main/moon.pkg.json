@@ -2,5 +2,13 @@
   "is-main": true,
   "import": [
     "moonbitlang/showcase-fft/lib"
-  ]
+  ],
+  "link": {
+    "native": {
+      "flags": [
+        "-cc",
+        "gcc -O2 -fwrapv"
+      ]
+    }
+  }
 }

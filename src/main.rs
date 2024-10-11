@@ -189,7 +189,7 @@ fn bench_setup() -> Result<Vec<Demo>> {
 
     eprintln!("INFO: checking the correctness of the Moonbit FFT demo...");
     eprintln!("WARN: currently the Moonbit demo has no I/O except stdout prints");
-    let mut mbt_demo = Demo::new("Moonbit", {
+    let mut mbt_demo = Demo::new("MoonBit", {
         // TODO: Add stdin for both demos.
         Command::new(&mbt_exe_path)
     });
